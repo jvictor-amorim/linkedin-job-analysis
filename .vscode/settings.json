@@ -1,0 +1,8 @@
+{
+  "files.associations": {
+    "*.csv": "csv"
+  },
+  "[csv]": {
+    "editor.defaultFormatter": null
+  }
+}
