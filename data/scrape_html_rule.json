@@ -1,0 +1,115 @@
+[
+  {
+    "job_id": "4419256409",
+    "title": "ANALISTA DE DADOS PL",
+    "company": "Cacau Show",
+    "city": "São Paulo, SP",
+    "work_mode": null,
+    "skills": [
+      "Autonomia",
+      "Azure",
+      "CI/CD",
+      "Comunicacao",
+      "Data Governance",
+      "Data Lake",
+      "Data Pipelines",
+      "Data Visualization",
+      "Databricks",
+      "ETL",
+      "Excel",
+      "Git",
+      "Pensamento Analitico",
+      "Power BI",
+      "Python",
+      "SQL",
+      "Spark"
+    ]
+  },
+  {
+    "job_id": "4409624796",
+    "title": "Analista de Dados Júnior | Direitos",
+    "company": "Globo",
+    "city": "Rio de Janeiro e Região",
+    "work_mode": null,
+    "skills": [
+      "Comunicacao",
+      "Excel",
+      "GCP",
+      "Lideranca",
+      "Organizacao",
+      "Power BI",
+      "PowerPoint",
+      "SQL",
+      "Storytelling"
+    ]
+  },
+  {
+    "job_id": "4418846380",
+    "title": "Engenheiro de Dados Jr.",
+    "company": "PagBank",
+    "city": "São Paulo, SP",
+    "work_mode": "hibrido",
+    "skills": [
+      "AWS",
+      "Airflow",
+      "CI/CD",
+      "Data Modeling",
+      "Data Pipelines",
+      "Git",
+      "Linux",
+      "SQL",
+      "Trabalho em Equipe"
+    ]
+  },
+  {
+    "job_id": "4417995050",
+    "title": "Analista de Dados de Sinistro Jr",
+    "company": "Brasilseg",
+    "city": "Franca, SP",
+    "work_mode": null,
+    "skills": [
+      "Comunicacao",
+      "Excel",
+      "Pensamento Analitico",
+      "Proatividade",
+      "Workflow"
+    ]
+  },
+  {
+    "job_id": "4423299033",
+    "title": "analista de dados júnior",
+    "company": "enjoei",
+    "city": "Brasil",
+    "work_mode": "remoto",
+    "skills": [
+      "Comunicacao",
+      "Curiosidade",
+      "Data Visualization",
+      "Excel",
+      "Java",
+      "Looker",
+      "Pensamento Analitico",
+      "Power BI",
+      "Proatividade",
+      "Python",
+      "Resolucao de Problemas",
+      "SQL",
+      "Tableau",
+      "Trabalho em Equipe"
+    ]
+  },
+  {
+    "job_id": "4417507087",
+    "title": "Analista de Operações Jr (Foco em Dados/Indicadores) - Temporário",
+    "company": "SulAmérica",
+    "city": "São Paulo, SP",
+    "work_mode": "hibrido",
+    "skills": [
+      "Agile",
+      "Data Visualization",
+      "Estatistica",
+      "Excel",
+      "Organizacao"
+    ]
+  }
+]

@@ -6,16 +6,22 @@ import sys
 import time
 import random
 from pathlib import Path
-from dotenv import load_dotenv
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
-BASE_DIR = Path(__file__).resolve().parent
-OUTPUT_CSV = BASE_DIR / "files" / "linkedin-job-ids.csv"
-SEARCH_URL = "https://br.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/engenheiro-de-dados-vagas?start={}"
-# Load environment variables from the project .env (mounted at /opt/airflow/.env in the container).
-# override=True so runtime edits to .env win over stale values baked in at container creation.
-load_dotenv(BASE_DIR.parent / ".env", override=True)
+# Bootstrap: sobe até achar o pacote `common` e o coloca no sys.path.
+_root = Path(__file__).resolve()
+while not (_root / "common").is_dir():
+    _root = _root.parent
+sys.path.insert(0, str(_root))
+
+# common.config já carrega o .env (override=True) e centraliza paths/delays.
+from common.config import DATA_DIR, REQUEST_DELAY_MIN, REQUEST_DELAY_MAX
+
+OUTPUT_CSV = DATA_DIR / "job_ids.csv"
+#SEARCH_URL = "https://br.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/engenheiro-de-dados-vagas?start={}"
+#SEARCH_URL = "https://br.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/analista-de-dados-vagas?start={}"
+SEARCH_URL = "https://br.linkedin.com/jobs-guest/jobs/api/seeMoreJobPostings/cientista-de-dados-vagas?start={}"
 
 # Number of pagination steps to fetch. Each step advances by 10 results.
 max_pagination_steps = int(os.getenv("MAX_PAGINATION_STEPS") or 1)
@@ -25,10 +31,6 @@ HEADERS = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
 }
 ID_PATTERN = re.compile(r'data-entity-urn="urn:li:jobPosting:(\d+)"')
-
-# Request delay configuration (seconds). Set via environment variables for easy changes.
-REQUEST_DELAY_MIN = int(os.getenv("REQUEST_DELAY_MIN", "5"))
-REQUEST_DELAY_MAX = int(os.getenv("REQUEST_DELAY_MAX", "15"))
 
 def _random_delay_seconds() -> float:
     return random.uniform(REQUEST_DELAY_MIN, REQUEST_DELAY_MAX)
@@ -60,6 +62,18 @@ def load_existing_job_ids() -> set[str]:
     return set()
 
 
+def append_job_ids(job_ids: list[str], url: str) -> None:
+    """Append new job IDs to the CSV, writing the header if the file is new."""
+    OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
+    write_header = not OUTPUT_CSV.exists() or OUTPUT_CSV.stat().st_size == 0
+    with OUTPUT_CSV.open("a", encoding="utf-8", newline="") as fh:
+        writer = csv.writer(fh)
+        if write_header:
+            writer.writerow(["job_id", "url"])
+        writer.writerows((job_id, url) for job_id in job_ids)
+    print(f"Appended {len(job_ids)} new ids to {OUTPUT_CSV}")
+
+
 def collect_job_ids() -> list[str]:
     page = 0
     seen = set()
@@ -81,6 +95,9 @@ def collect_job_ids() -> list[str]:
         new_ids = [job_id for job_id in ids if job_id not in seen and job_id not in existing_ids]
         if not new_ids:
             print("No new IDs on this page (all duplicates), continuing to next page.")
+        else:
+            # Persist this page's IDs immediately so progress survives interruptions
+            append_job_ids(new_ids, url)
 
         for job_id in new_ids:
             seen.add(job_id)
@@ -95,42 +112,15 @@ def collect_job_ids() -> list[str]:
         sleep_s = _random_delay_seconds()
         print(f"Sleeping {sleep_s:.1f} seconds before next page request")
         time.sleep(sleep_s)
-    return results, url
-
-
-def save_job_ids(job_ids: list[str], url: str) -> None:
-    OUTPUT_CSV.parent.mkdir(parents=True, exist_ok=True)
-    existing_rows = []
-    existing_ids = set()
-    if OUTPUT_CSV.exists():
-        with OUTPUT_CSV.open("r", encoding="utf-8", newline="") as fh:
-            reader = csv.DictReader(fh)
-            for row in reader:
-                job_id = row.get("job_id")
-                if job_id:
-                    existing_rows.append((job_id, row.get("url", "")))
-                    existing_ids.add(job_id)
-
-    new_rows = list(existing_rows)
-    for job_id in job_ids:
-        if job_id not in existing_ids:
-            new_rows.append((job_id, url))
-            existing_ids.add(job_id)
-
-    with OUTPUT_CSV.open("w", encoding="utf-8", newline="") as fh:
-        writer = csv.writer(fh)
-        writer.writerow(["job_id", "url"])
-        writer.writerows(new_rows)
-
-    print(f"Saved {len(new_rows)} ids to {OUTPUT_CSV} ({len(job_ids)} new ids appended)")
+    return results
 
 
 def main() -> None:
-    job_ids, url = collect_job_ids()
+    job_ids = collect_job_ids()
     if not job_ids:
         print("No job IDs were collected.")
         return
-    save_job_ids(job_ids, url)
+    print(f"Collected {len(job_ids)} new job ids in total.")
 
 
 if __name__ == "__main__":

@@ -8,27 +8,22 @@ from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
-def _run_script(rel_path: str) -> None:
+def _run_script(rel_path: str, *args: str) -> None:
     script_path = BASE_DIR / rel_path
-    subprocess.run([sys.executable, str(script_path)], check=True)
+    subprocess.run([sys.executable, str(script_path), *args], check=True)
 
 
-def scrape_jobs() -> None:
-    _run_script("extracts/linkedin-get-jobs.py")
+def collect_job_ids() -> None:
+    _run_script("extract/linkedin_jobs/collect_job_ids.py")
 
 
-def scrape_job_details() -> None:
-    _run_script("extracts/linkedin-get-jobs-detail.py")
+def scrape_skills() -> None:
+    # Abordagem regex: baixa o HTML e extrai skills/modalidade numa só passada.
+    _run_script("extract/scrape_html_rule/scrape_html_rule.py")
 
 
-def extract_skills() -> None:
-    _run_script("extracts/extract-skills.py")
-
-
-def export_dataset() -> None:
-    # Placeholder: if you have a separate export script, point to it here.
-    # For now this runs the skills extractor as a stub.
-    _run_script("extracts/extract-skills.py")
+def load_dataset() -> None:
+    _run_script("load/load.py")
 
 
 with DAG(
@@ -39,26 +34,19 @@ with DAG(
     tags=["portfolio", "linkedin"],
 ) as dag:
 
-    scrape_task = PythonOperator(
-        task_id="scrape_jobs",
-        python_callable=scrape_jobs,
-    )
-
-    detail_task = PythonOperator(
-        task_id="scrape_job_details",
-        python_callable=scrape_job_details,
+    ids_task = PythonOperator(
+        task_id="collect_job_ids",
+        python_callable=collect_job_ids,
     )
 
     skills_task = PythonOperator(
-        task_id="extract_skills",
-        python_callable=extract_skills,
+        task_id="scrape_skills",
+        python_callable=scrape_skills,
     )
 
-    # export_task = PythonOperator(
-    #     task_id="export_dataset",
-    #     python_callable=export_dataset,
-    # )
+    load_task = PythonOperator(
+        task_id="load_dataset",
+        python_callable=load_dataset,
+    )
 
-    #scrape_task >> detail_task >> skills_task >> export_task
-    scrape_task >> detail_task >> skills_task
-    #skills_task
+    ids_task >> skills_task >> load_task

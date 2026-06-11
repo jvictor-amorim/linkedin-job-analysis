@@ -81,7 +81,11 @@ x-airflow-common:
     - ${AIRFLOW_PROJ_DIR:-.}/logs:/opt/airflow/logs
     - ${AIRFLOW_PROJ_DIR:-.}/config:/opt/airflow/config
     - ${AIRFLOW_PROJ_DIR:-.}/plugins:/opt/airflow/plugins
-    - ${AIRFLOW_PROJ_DIR:-.}/extracts:/opt/airflow/extracts
+    - ${AIRFLOW_PROJ_DIR:-.}/common:/opt/airflow/common
+    - ${AIRFLOW_PROJ_DIR:-.}/extract:/opt/airflow/extract
+    - ${AIRFLOW_PROJ_DIR:-.}/load:/opt/airflow/load
+    - ${AIRFLOW_PROJ_DIR:-.}/data:/opt/airflow/data
+    - ${AIRFLOW_PROJ_DIR:-.}/sql:/opt/airflow/sql
     # Mount .env so scripts can load_dotenv() at runtime (env changes apply without recreating containers)
     - ${ENV_FILE_PATH:-./.env}:/opt/airflow/.env:ro
   user: "${AIRFLOW_UID:-50000}:0"
@@ -101,6 +105,9 @@ services:
       POSTGRES_DB: airflow
     volumes:
       - postgres-db-volume:/var/lib/postgresql/data
+    ports:
+      # Exposto no host para os scripts ETL conectarem (DB_HOST=localhost).
+      - "5432:5432"
     healthcheck:
       test: ["CMD", "pg_isready", "-U", "airflow"]
       interval: 10s
