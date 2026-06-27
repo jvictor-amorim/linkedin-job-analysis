@@ -332,6 +332,20 @@ def _validate(df: pd.DataFrame) -> None:
         for _, r in top.iterrows():
             print(f"    {r['skill']:22s} {r['pct']:4.0f}%  ({int(r['n_jobs'])})")
 
+    print("\n=== Proximidade das vagas 'Não especificadas' ===")
+    tops = {lv: set(skill_share_by_level(df, lv, "tecnica").head(10)["skill"]) 
+            for lv in ("junior", "pleno", "senior")}
+    df_ne = df[(df["level"] == "nao_especificado") & (df["tipo_skill"] == "tecnica")]
+    jobs = df_ne.groupby("job_id")["skill"].apply(set)
+    scores = {"junior": 0, "pleno": 0, "senior": 0}
+    for skills in jobs:
+        for lv in ("junior", "pleno", "senior"):
+            scores[lv] += len(skills & tops[lv])
+    total_scores = sum(scores.values())
+    if total_scores > 0:
+        for lv in ("junior", "pleno", "senior"):
+            print(f"  {LEVEL_LABELS[lv]}: {scores[lv]/total_scores*100:.1f}%")
+
 
 # ===========================================================================
 # Plotagem — carrossel de PNGs (1080x1350 px, retrato 4:5)
@@ -360,7 +374,7 @@ LEVEL_COLORS = {
 }
 
 DPI = 150
-FIGSIZE = (7.2, 9.0)   # 7.2*150 x 9.0*150 = 1080 x 1350
+FIGSIZE = (10.8, 9.0)   # 10.8*150 x 9.0*150 = 1620 x 1350 (Mais larga)
 HANDLE = "Dados coletados do LinkedIn"
 
 
@@ -456,11 +470,50 @@ def slide_amostra(df):
     _barh(ax, labels, values, colors, value_fmt="{:.0f}")
     fig.text(0.07, 0.145,
              f"⚠  {pct_ne:.0f}% das vagas não trazem o nível no título "
-             "(“Não especificado”).\nOs slides seguintes comparam apenas "
-             "Júnior, Pleno e Sênior.",
+             "(“Não especificado”).\nNo próximo slide analisamos o perfil dessas vagas.",
              color=MUTED, fontsize=11.5, va="top", linespacing=1.4)
     _footer(fig)
     return _save(fig, "02_amostra.png")
+
+
+def slide_nao_especificado(df):
+    """Analisa as vagas sem senioridade e calcula a proximidade com os outros níveis."""
+    fig = _new_fig()
+    
+    tops = {lv: set(skill_share_by_level(df, lv, "tecnica").head(10)["skill"]) 
+            for lv in ("junior", "pleno", "senior")}
+            
+    df_ne = df[(df["level"] == "nao_especificado") & (df["tipo_skill"] == "tecnica")]
+    jobs = df_ne.groupby("job_id")["skill"].apply(set)
+    
+    scores = {"junior": 0, "pleno": 0, "senior": 0}
+    for skills in jobs:
+        for lv in ("junior", "pleno", "senior"):
+            scores[lv] += len(skills & tops[lv])
+            
+    total = sum(scores.values())
+    pcts = {lv: (scores[lv] / total * 100) if total > 0 else 0 for lv in ("junior", "pleno", "senior")}
+    
+    _header(fig, "Nível Oculto", "Perfil das vagas sem senioridade",
+            f"Analisando o match das skills nas {len(jobs)} vagas \"Não especificadas\"\n"
+            "com o Top 10 técnico de cada nível. Com quem elas mais parecem?")
+            
+    ax = _axes(fig, rect=(0.30, 0.22, 0.63, 0.50))
+    
+    order = ["junior", "pleno", "senior"]
+    labels = [LEVEL_LABELS[lv] for lv in order]
+    vals = [pcts[lv] for lv in order]
+    colors = [LEVEL_COLORS[lv] for lv in order]
+    
+    _barh(ax, labels, vals, colors, value_fmt="{:.1f}%")
+    
+    fig.text(0.07, 0.145,
+             "O percentual reflete a similaridade das exigências técnicas com o\n"
+             "perfil padrão (Top 10) de cada senioridade no mercado.",
+             color=MUTED, fontsize=11.5, va="top", linespacing=1.4)
+             
+    _footer(fig)
+    return _save(fig, "03_nao_especificado.png")
 
 
 def _slide_top_skills(df, level, idx):
@@ -514,18 +567,21 @@ def slide_nucleo(df):
     ax.set_xlim(0, 100)
     ax.legend(loc="lower right", frameon=False, labelcolor=INK, fontsize=11.5)
     _footer(fig)
-    return _save(fig, "06_nucleo.png")
+    return _save(fig, "07_nucleo.png")
 
 
 def slide_diferencia(df):
-    """Skills que mais crescem de júnior -> sênior."""
+    """Skills que mais crescem de júnior -> sênior (incluindo pleno)."""
     fig = _new_fig()
     jr = skill_share_by_level(df, "junior", "tecnica").set_index("skill")["pct"]
     sr = skill_share_by_level(df, "senior", "tecnica").set_index("skill")["pct"]
-    skills = sorted(set(jr.index) | set(sr.index))
+    pl = skill_share_by_level(df, "pleno", "tecnica").set_index("skill")["pct"]
+    
+    skills = sorted(set(jr.index) | set(sr.index) | set(pl.index))
     diff = pd.DataFrame({
         "skill": skills,
         "junior": [jr.get(s, 0) for s in skills],
+        "pleno": [pl.get(s, 0) for s in skills],
         "senior": [sr.get(s, 0) for s in skills],
     })
     diff["delta"] = diff["senior"] - diff["junior"]
@@ -533,18 +589,38 @@ def slide_diferencia(df):
     diff = diff[diff["senior"] >= 15].sort_values("delta", ascending=False).head(10)
 
     _header(fig, "A virada", "O que diferencia o Sênior",
-            "Skills com maior salto na demanda de júnior → sênior\n"
-            "(diferença em pontos percentuais).")
-    ax = _axes(fig, rect=(0.30, 0.18, 0.63, 0.54))
+            "Evolução da demanda das skills que mais saltam de Júnior → Sênior.\n"
+            "Acompanhe também a transição no nível Pleno.")
+    ax = _axes(fig, rect=(0.30, 0.18, 0.63, 0.58))
     labels = [_pretty(s) for s in diff["skill"]]
-    vals = diff["delta"].tolist()
-    _barh(ax, labels, vals, [HILITE] * len(vals), value_fmt="+{:.0f} pp")
+    y = range(len(labels))
+    bar_h = 0.26
+    
+    levels = ("junior", "pleno", "senior")
+    xmax = max((diff[lv].max() for lv in levels), default=1)
+    
+    for i, lv in enumerate(levels):
+        vals = diff[lv].tolist()
+        offs = [yi + (i - 1) * bar_h for yi in y]
+        ax.barh(offs, vals, height=bar_h, color=LEVEL_COLORS[lv],
+                label=LEVEL_LABELS[lv], zorder=3)
+        for off, v in zip(offs, vals):
+            ax.text(v + xmax * 0.015, off, f"{v:.0f}%", va="center", ha="left",
+                    color=INK, fontsize=8.5)
+            
+    ax.set_yticks(list(y))
+    ax.set_yticklabels(labels, color=INK, fontsize=13.5)
+    ax.invert_yaxis()
+    ax.set_xticks([])
+    ax.set_xlim(0, xmax * 1.18)
+    ax.legend(loc="lower right", frameon=False, labelcolor=INK, fontsize=11.5)
+    
     fig.text(0.07, 0.115,
              "Engenharia, cloud e governança é o que separa o sênior:\n"
              "menos relatório, mais arquitetura de dados.",
              color=MUTED, fontsize=11.5, va="top", linespacing=1.4)
     _footer(fig)
-    return _save(fig, "07_diferencia.png")
+    return _save(fig, "08_diferencia.png")
 
 
 def slide_soft(df):
@@ -554,7 +630,7 @@ def slide_soft(df):
     # Top soft skills por presença total nos 3 níveis.
     soft = df[(df["tipo_skill"] == "soft") & (df["level"].isin(levels))]
     top_soft = (soft.groupby("skill")["job_id"].nunique()
-                .sort_values(ascending=False).head(6).index.tolist())
+                .sort_values(ascending=False).head(3).index.tolist())
     rows = []
     for sk in top_soft:
         pcts = {lv: float(skill_share_by_level(df, lv, "soft")
@@ -584,7 +660,7 @@ def slide_soft(df):
     ax.set_xlim(0, xmax * 1.18)
     ax.legend(loc="lower right", frameon=False, labelcolor=INK, fontsize=11.5)
     _footer(fig)
-    return _save(fig, "08_soft.png")
+    return _save(fig, "09_soft.png")
 
 
 def slide_conclusao(df):
@@ -599,7 +675,6 @@ def slide_conclusao(df):
         ("Júnior", "domine Power BI, Excel e dashboards."),
         ("Pleno → Sênior", "migre para pipelines, ETL e cloud (AWS/Databricks)."),
         ("Governança de dados", "é o que separa o sênior do resto."),
-        ("Soft skills", "pesam mais conforme você sobe."),
     ]
     yb = 0.70
     for head, txt in bullets:
@@ -623,12 +698,13 @@ def build_slides(df):
     print("Gerando carrossel em", OUTPUT_DIR.relative_to(_root), "…")
     slide_capa(df)
     slide_amostra(df)
-    _slide_top_skills(df, "junior", 3)
-    _slide_top_skills(df, "pleno", 4)
-    _slide_top_skills(df, "senior", 5)
+    slide_nao_especificado(df)
+    _slide_top_skills(df, "junior", 4)
+    _slide_top_skills(df, "pleno", 5)
+    _slide_top_skills(df, "senior", 6)
     slide_nucleo(df)
     slide_diferencia(df)
-    slide_soft(df)
+    # slide_soft(df)
     slide_conclusao(df)
     print("Carrossel completo.")
 
