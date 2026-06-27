@@ -5,3 +5,11 @@ __pycache__
 *.pyo
 logs
 .env
+
+# Artefatos locais do pipeline — fonte da verdade é o Postgres (STORAGE_BACKEND=database).
+# Mantém data/job_ids.csv (semente de coleta), que NÃO é gerado pelo banco.
+data/job_html.csv
+data/scrape_html_rule.json
+data/jobs.csv
+data/job_skills.csv
+gemini.config.json

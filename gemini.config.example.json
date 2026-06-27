@@ -1,0 +1,6 @@
+{
+  "provider": "openrouter",
+  "apiKey": "sk-or-v1-...",
+  "baseUrl": "https://openrouter.ai/api/v1",
+  "model": "google/gemini 3.5-flash"
+}

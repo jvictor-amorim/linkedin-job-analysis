@@ -3,18 +3,31 @@
 """
 scrape_html_rule.py
 
-Abordagem por dicionário de regex (sem classificação por seção).
+Script de extração implementado.
+Abordagem inteligente por dicionário de regex (sem classificação por seção).
 
-Passada única e idempotente: para cada job_id do data/job_ids.csv que ainda não
-está no data/scrape_html_rule.json, baixa o HTML da vaga, aplica o motor de regex
-de skills + detecção de modalidade sobre o texto, e grava imediatamente em
-data/scrape_html_rule.json:
+Para cada job_id ainda não processado: obtém o HTML da vaga, aplica o motor de
+regex de skills + detecção de modalidade e grava imediatamente o resultado:
     { job_id, title, company, city, work_mode, skills: [...] }
 
-A idempotência vem do próprio scrape_html_rule.json (vaga já presente é pulada,
-sem rebaixar). O dicionário de skills fica em skills_dict.py (fácil de editar/agrupar).
+O destino segue STORAGE_BACKEND (ver common/config.py):
+  database  grava direto nas tabelas jobs + job_skills (via common.db) e NÃO cria
+            nenhum arquivo local; a idempotência vem da tabela jobs.
+  local     grava em data/scrape_html_rule.json; a idempotência vem do próprio JSON.
+
+As etapas são controladas por --stage:
+  fetch              só BAIXA o HTML das vagas (de data/job_ids.csv) para o cache,
+                     sem extrair nada — etapa de rede, isolável e lenta.
+  extract            só EXTRAI do HTML já em cache (offline, sem rede) → destino.
+  all      (padrão)  baixa o que faltar no cache e já extrai, numa passada só.
+
+O cache de HTML (job_id, html_text) também segue STORAGE_BACKEND: data/job_html.csv
+(local) ou tabela job_html (database) — ver common/html_store.py.
+
+O dicionário de skills fica em skills_dict.py.
 """
 
+import argparse
 import csv
 import json
 import random
@@ -39,6 +52,7 @@ while not (_root / "common").is_dir():
 sys.path.insert(0, str(_root))
 
 from common.config import DATA_DIR, REQUEST_DELAY_MIN, REQUEST_DELAY_MAX
+from common import config, html_store
 
 from skills_dict import SKILLS
 
@@ -72,39 +86,63 @@ def _norm(s: str) -> str:
     return re.sub(r"\s+", " ", s).lower()
 
 
-def _alias_pattern(alias: str) -> re.Pattern | None:
-    """Compila um alias em regex que tolera junto/separado/hífen.
+def _alias_body(alias: str) -> str | None:
+    """Corpo de regex de um alias, tolerando junto/separado/hífen/barra.
     Ex.: 'data integration' -> casa 'data integration', 'dataintegration',
-    'data-integration'. Usa lookarounds (não \\b) para funcionar com tokens
-    que têm dígitos/símbolos como 's3', 'ci/cd', 'k8s'."""
+    'data-integration'. Funciona com tokens que têm dígitos/símbolos como
+    's3', 'ci/cd', 'k8s'. Retorna só o corpo (sem âncoras)."""
     a = _norm(alias).strip()
     tokens = [re.escape(t) for t in re.split(r"[\s/\-]+", a) if t]
     if not tokens:
         return None
-    body = r"[\s\-/]*".join(tokens)
-    return re.compile(rf"(?<![a-z0-9]){body}(?![a-z0-9])", re.I)
+    return r"[\s\-/]*".join(tokens)
 
 
-# pré-compila uma vez (canônico -> lista de padrões)
-_COMPILED = {
-    canon: [p for p in (_alias_pattern(a) for a in aliases) if p]
-    for canon, aliases in SKILLS.items()
-}
+def _build_engine():
+    """Monta UM único regex com todos os aliases ordenados do mais longo para o
+    mais curto (longest-match). Usar um padrão unificado + finditer faz o trecho
+    casado ser consumido sem overlap: 'spark sql' casa 'Spark SQL' e o 'spark'
+    interno NÃO dispara de novo. Roda uma vez na importação.
+
+    Retorna (regex_compilado, dict chave-normalizada -> nome canônico)."""
+    pairs = sorted(
+        ((alias, canon) for canon, aliases in SKILLS.items() for alias in aliases),
+        key=lambda x: len(_norm(x[0])),
+        reverse=True,
+    )
+    parts: list[str] = []
+    lookup: dict[str, str] = {}
+    for alias, canon in pairs:
+        body = _alias_body(alias)
+        if not body:
+            continue
+        parts.append(body)
+        # chave: alias normalizado com separadores colapsados, p/ resolver o match
+        lookup[re.sub(r"[\s\-/]+", "", _norm(alias))] = canon
+    pattern = re.compile(
+        r"(?<![a-z0-9])(?:" + "|".join(parts) + r")(?![a-z0-9])", re.I
+    )
+    return pattern, lookup
+
+
+# pré-compila uma vez
+_MASTER, _LOOKUP = _build_engine()
 
 
 def extract_skills(text: str) -> list[str]:
     """Retorna a lista de skills canônicas encontradas no texto, ordenada.
-    Cada grupo entra no máximo uma vez (agrupamento por nome canônico)."""
+    Cada nome canônico entra no máximo uma vez. Longest-match garante que
+    aliases compostos (ex.: 'spark sql') vençam o alias curto contido neles."""
     if not text:
         return []
     norm = _norm(text)
-    found = []
-    for canon, patterns in _COMPILED.items():
-        for p in patterns:
-            if p.search(norm):
-                found.append(canon)
-                break  # achou um alias do grupo; não precisa testar os demais
-    return sorted(set(found))
+    found = set()
+    for m in _MASTER.finditer(norm):
+        key = re.sub(r"[\s\-/]+", "", m.group(0).lower())
+        canon = _LOOKUP.get(key)
+        if canon:
+            found.add(canon)
+    return sorted(found)
 
 
 # ===========================================================================
@@ -231,19 +269,102 @@ def build_entry(job_id: str, html: str) -> dict:
 
 
 # ===========================================================================
-# Passada única — baixa + extrai + grava (idempotente via scrape_html_rule.json)
+# Passada principal — obtém HTML (request/cache) + extrai + grava
 # ===========================================================================
-def run(job_ids: list) -> None:
-    """Para cada vaga ainda não presente no scrape_html_rule.json: baixa o HTML,
-    extrai skills/modalidade e grava no JSON imediatamente. Vaga já no JSON é
-    pulada sem rebaixar. Ctrl-C é seguro: o output é salvo a cada entrada."""
-    output = load_output()
-    processed = {str(item["job_id"]) for item in output if item.get("job_id")}
+def _db_processed_ids(conn) -> set:
+    """Conjunto de job_ids já gravados na tabela jobs (idempotência no modo database)."""
+    with conn.cursor() as cur:
+        cur.execute("SELECT job_id FROM jobs")
+        return {str(r[0]) for r in cur.fetchall()}
+
+
+def run(job_ids: list, allow_fetch: bool, html_cache: dict) -> None:
+    """Etapa de extração: para cada vaga ainda não processada, obtém o HTML (do
+    cache se houver; senão baixa, se allow_fetch), extrai skills/modalidade e grava
+    no destino conforme STORAGE_BACKEND. Com allow_fetch=False, vagas sem HTML em
+    cache são puladas (reprocessamento offline). Idempotente (vaga já gravada é
+    pulada) e Ctrl-C é seguro (cada entrada é persistida imediatamente)."""
+    use_db = config.STORAGE_BACKEND == "database"
     total = len(job_ids)
 
+    if use_db:
+        from common import db
+        conn = db.get_connection()
+        db.ensure_schema(conn)
+        processed = _db_processed_ids(conn)
+        output = None
+    else:
+        conn = None
+        output = load_output()
+        processed = {str(item["job_id"]) for item in output if item.get("job_id")}
+
+    try:
+        for idx, job_id in enumerate(job_ids, start=1):
+            jid = str(job_id)
+            if jid in processed:
+                destino = "no banco" if use_db else "no JSON"
+                print(f"[{idx}/{total}] {job_id} já {destino}, pulando", flush=True)
+                continue
+
+            downloaded = False
+            if jid in html_cache:
+                html = html_cache[jid]  # reusa cache, sem request
+            elif not allow_fetch:
+                print(f"[{idx}/{total}] {job_id} sem HTML no cache, pulando", flush=True)
+                continue
+            else:
+                print(f"[{idx}/{total}] baixando {job_id} …", flush=True)
+                html = fetch_html(DETAIL_URL.format(job_id))
+                if not html:
+                    print("  → resposta vazia, pulando.", flush=True)
+                    continue
+                html_store.save_html(job_id, html)  # salva no cache p/ reprocessar
+                html_cache[jid] = html
+                downloaded = True
+
+            entry = build_entry(job_id, html)
+            if use_db:
+                db.upsert_job(conn, entry)
+                db.replace_job_skills(conn, jid, entry["skills"])
+                conn.commit()
+            else:
+                output.append(entry)
+                save_output(output)
+            processed.add(jid)
+            _print_entry(entry, downloaded, len(processed))
+
+            if downloaded:
+                delay = _random_delay()
+                print(f"  → aguardando {delay:.1f}s …", flush=True)
+                time.sleep(delay)
+    finally:
+        if conn is not None:
+            conn.close()
+
+
+def _print_entry(entry: dict, downloaded: bool, count: int) -> None:
+    cargo_str = entry["title"] or "(sem cargo)"
+    empresa_str = entry["company"] or "(sem empresa)"
+    cidade_str = entry["city"] or "(sem cidade)"
+    skills = entry["skills"]
+    origem = "baixado" if downloaded else "cache"
+    print(
+        f"  → [{origem}] {cargo_str} @ {empresa_str} ({cidade_str}) "
+        f"→ {len(skills)} skills: {skills[:5]} [processadas: {count}]",
+        flush=True,
+    )
+
+
+def run_fetch(job_ids: list, html_cache: dict) -> None:
+    """Etapa de fetch (só rede): baixa o HTML das vagas ainda não cacheadas e
+    salva no cache (job_html), SEM extrair skills nem gravar em jobs/job_skills.
+    Idempotente pelo cache; Ctrl-C é seguro (cada HTML é salvo imediatamente)."""
+    total = len(job_ids)
+    baixadas = 0
     for idx, job_id in enumerate(job_ids, start=1):
-        if str(job_id) in processed:
-            print(f"[{idx}/{total}] {job_id} já no JSON, pulando", flush=True)
+        jid = str(job_id)
+        if jid in html_cache:
+            print(f"[{idx}/{total}] {job_id} já no cache, pulando", flush=True)
             continue
 
         print(f"[{idx}/{total}] baixando {job_id} …", flush=True)
@@ -251,38 +372,65 @@ def run(job_ids: list) -> None:
         if not html:
             print("  → resposta vazia, pulando.", flush=True)
             continue
-
-        entry = build_entry(job_id, html)
-        output.append(entry)
-        processed.add(str(job_id))
-        save_output(output)
-        cargo_str = entry["title"] or "(sem cargo)"
-        empresa_str = entry["company"] or "(sem empresa)"
-        cidade_str = entry["city"] or "(sem cidade)"
-        skills = entry["skills"]
-        print(
-            f"  → {cargo_str} @ {empresa_str} ({cidade_str}) "
-            f"→ {len(skills)} skills: {skills[:5]} [output: {len(output)}]",
-            flush=True,
-        )
+        html_store.save_html(job_id, html)
+        html_cache[jid] = html
+        baixadas += 1
 
         delay = _random_delay()
-        print(f"  → aguardando {delay:.1f}s …", flush=True)
+        print(f"  → ok ({len(html)} bytes); aguardando {delay:.1f}s …", flush=True)
         time.sleep(delay)
+
+    print(f"\nFetch concluído: {baixadas} novas vagas salvas no cache.", flush=True)
 
 
 # ===========================================================================
 # Main
 # ===========================================================================
 def main() -> None:
-    job_ids = load_job_ids()
-    if not job_ids:
-        print(f"Nenhum job_id em {JOB_IDS_CSV}. Rode collect_job_ids.py antes.", flush=True)
-        sys.exit(1)
+    parser = argparse.ArgumentParser(
+        description="Extrai skills/modalidade de vagas do LinkedIn (regex)."
+    )
+    parser.add_argument(
+        "--stage",
+        choices=["fetch", "extract", "all"],
+        default="all",
+        help=(
+            "fetch: só BAIXA o HTML das vagas (job_ids.csv) para o cache, sem extrair. "
+            "extract: só EXTRAI skills/modalidade do HTML já em cache (offline) → destino. "
+            "all (padrão): baixa o que faltar e já extrai, numa passada só."
+        ),
+    )
+    args = parser.parse_args()
 
-    print("=== scrape + regex de skills ===", flush=True)
-    run(job_ids)
-    print(f"\nPronto. {OUTPUT_JSON.name} atualizado.", flush=True)
+    html_cache = html_store.load_html_map()
+
+    if args.stage == "extract":
+        if not html_cache:
+            print("Cache de HTML vazio. Rode '--stage fetch' antes.", flush=True)
+            sys.exit(1)
+        job_ids = list(html_cache.keys())
+    else:  # fetch | all → precisam da lista-semente de IDs
+        job_ids = load_job_ids()
+        if not job_ids:
+            print(f"Nenhum job_id em {JOB_IDS_CSV}. Rode collect_job_ids.py antes.", flush=True)
+            sys.exit(1)
+
+    print(f"=== scrape_html_rule (stage={args.stage}) ===", flush=True)
+
+    if args.stage == "fetch":
+        run_fetch(job_ids, html_cache)
+        print(f"\nPronto. HTML salvo no cache "
+              f"({'tabela job_html' if config.STORAGE_BACKEND == 'database' else 'data/job_html.csv'}).",
+              flush=True)
+        return
+
+    run(job_ids, allow_fetch=(args.stage == "all"), html_cache=html_cache)
+    destino = (
+        f"tabelas jobs/job_skills em {config.DB_NAME}@{config.DB_HOST}"
+        if config.STORAGE_BACKEND == "database"
+        else OUTPUT_JSON.name
+    )
+    print(f"\nPronto. {destino} atualizado.", flush=True)
 
 
 if __name__ == "__main__":

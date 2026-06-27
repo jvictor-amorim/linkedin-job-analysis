@@ -2,157 +2,317 @@
 """
 skills_dict.py
 
-Dicionário de skills para extração via regex.
+Dicionário de skills para extração via regex, otimizado.
 
-ESTRUTURA (simples de manter):
+ESTRUTURA (simples de manter e altamente escalável):
     "Nome Canônico": ["alias1", "alias2", ...]
 
 REGRAS DE MATCHING (implementadas em extract-skills-regex.py):
 - Cada alias casa como termo inteiro (com fronteiras), case-insensitive e sem acento.
-- Variação junto/separado/hífen é automática: "data integration" também casa
-  "dataintegration" e "data-integration".
-- AGRUPAMENTO: tudo que estiver sob o mesmo "Nome Canônico" vira aquele nome.
-  Ex.: "power query" e "dax" -> "Power BI".
+- Variação junto/separado/hífen é tratada de forma automática: "data integration" 
+  também casa "dataintegration" e "data-integration".
 
-PARA ADICIONAR: acrescente uma string na lista do grupo certo, ou crie uma nova
-chave canônica. Mantenha aliases em minúsculas (a normalização cuida do resto).
+PRINCÍPIO (revisado para máxima precisão):
+- Cada chave canônica representa UM conceito (uma linguagem, UMA biblioteca, UM
+  serviço, UMA ferramenta). Os aliases são APENAS variações de grafia do mesmo
+  nome (maiúsc/minúsc, com/sem ponto, sigla, tradução), NUNCA outro conceito.
+  Ex.: "scikit-learn" e "sklearn" são a mesma coisa; "pandas" e "python" NÃO são.
+- Termos genéricos (NoSQL, Machine Learning, Cloud) existem como chave própria,
+  capturando só os termos genéricos em si; cada ferramenta concreta é chave à parte.
+
+PARA ADICIONAR: crie uma nova chave canônica para o conceito, ou acrescente uma
+variação de grafia na lista existente. Mantenha aliases em minúsculas para manter
+o padrão definido.
 """
 
 SKILLS = {
-    # ---- Linguagens / bibliotecas core ----
-    "SQL":              ["sql", "t-sql", "tsql", "pl/sql", "plsql", "spark sql", "ansi sql",
-                          "advanced sql", "sql server", "oracle sql", "googlesql", "hiveql", "hql", "ksql", "kql"],
-    "Python":           ["python", "pandas", "numpy", "pyspark", "scikit-learn", "sklearn",
-                          "scipy", "matplotlib", "seaborn", "polars", "fastapi", "flask", "django",
-                          "pytest", "sqlalchemy", "openpyxl", "beautifulsoup", "scrapy"],
+    # ===================== Linguagens =====================
+    "SQL":              ["sql", "ansi sql", "advanced sql"],
+    "T-SQL":            ["t-sql", "tsql"],
+    "PL/SQL":           ["pl/sql", "plsql"],
+    "HiveQL":           ["hiveql", "hql"],
+    "KSQL":             ["ksql"],
+    "KQL":              ["kql"],
+    "Python":           ["python"],
     "Scala":            ["scala"],
     "Java":             ["java"],
-    "JavaScript":       ["javascript", "typescript", "node", "node.js", "react", "angular", "vue"],
-    "R":                ["rstudio", "shiny"],
+    "JavaScript":       ["javascript"],
+    "TypeScript":       ["typescript"],
+    "R":                ["rstudio"],
     "VBA":              ["vba", "macros", "macro"],
 
-    # ---- BI / Visualização ----
-    "Power BI":         ["power bi", "powerbi", "power query", "power pivot", "dax", "power bi dax",
-                          "power dax", "power bi gateway", "power bi intermediario", "power bi avancado"],
-    "Tableau":          ["tableau"],
-    "Looker":           ["looker", "looker studio", "google looker studio", "data studio", "google data studio"],
-    "Qlik":             ["qlik", "qlik sense", "qlikview"],
-    "Metabase":         ["metabase"],
-    "Superset":         ["superset", "apache superset"],
-    "Data Visualization":["data visualization", "visualizacao de dados", "dataviz", "dashboards", "dashboard"],
+    # ===================== Bibliotecas Python =====================
+    "pandas":           ["pandas"],
+    "NumPy":            ["numpy"],
+    "PySpark":          ["pyspark"],
+    "scikit-learn":     ["scikit-learn", "sklearn"],
+    "SciPy":            ["scipy"],
+    "Matplotlib":       ["matplotlib"],
+    "Seaborn":          ["seaborn"],
+    "Polars":           ["polars"],
+    "FastAPI":          ["fastapi"],
+    "Flask":            ["flask"],
+    "Django":           ["django"],
+    "pytest":           ["pytest"],
+    "SQLAlchemy":       ["sqlalchemy"],
+    "openpyxl":         ["openpyxl"],
+    "BeautifulSoup":    ["beautifulsoup"],
+    "Scrapy":           ["scrapy"],
 
-    # ---- Cloud ----
-    "AWS":              ["aws", "amazon web services", "s3", "redshift", "aws glue", "glue", "athena",
-                          "aws lambda", "lambda", "emr", "aws emr", "kinesis", "ec2", "sagemaker",
-                          "aws sagemaker", "step functions", "dynamodb", "aws rds", "rds", "cloudwatch",
-                          "amazon redshift", "aws athena", "aws s3", "aws redshift"],
-    "Azure":            ["azure", "microsoft azure", "azure data factory", "adf", "azure devops",
-                          "azure synapse", "synapse", "azure functions", "azure data lake",
-                          "azure event hub", "azure synapse analytics", "microsoft fabric", "fabric",
-                          "azure data lake storage", "adls", "azure sql", "azure blob storage"],
-    "GCP":              ["gcp", "google cloud", "google cloud platform", "bigquery", "google bigquery",
-                          "dataflow", "dataproc", "cloud composer", "cloud functions", "cloud run",
-                          "pub/sub", "cloud storage", "dataform", "vertex ai", "vertex"],
+    # ===================== Bibliotecas JS =====================
+    "Node.js":          ["node.js", "nodejs", "node"],
+    "React":            ["react"],
+    "Angular":          ["angular"],
+    "Vue":              ["vue"],
+
+    # ===================== Bibliotecas R =====================
+    "Shiny":            ["shiny"],
+
+    # ===================== BI / Visualização =====================
+    "Power BI":         ["power bi", "powerbi", "power bi gateway",
+                         "power bi intermediario", "power bi avancado"],
+    "DAX":              ["dax"],
+    "Power Query":      ["power query"],
+    "Power Pivot":      ["power pivot"],
+    "Tableau":          ["tableau"],
+    "Looker":           ["looker"],
+    "Looker Studio":    ["looker studio", "google looker studio", "data studio", "google data studio"],
+    "Qlik Sense":       ["qlik sense"],
+    "QlikView":         ["qlikview"],
+    "Qlik":             ["qlik"],
+    "Metabase":         ["metabase"],
+    "Apache Superset":  ["superset", "apache superset"],
+    "Dashboards":       ["dashboards", "dashboard", "data visualization", "visualizacao de dados", "dataviz"],
+
+    # ===================== Cloud (genéricos) =====================
+    "AWS":              ["aws", "amazon web services"],
+    "Azure":            ["azure", "microsoft azure"],
+    "GCP":              ["gcp", "google cloud", "google cloud platform"],
     "Oracle Cloud":     ["oci", "oracle cloud"],
 
-    # ---- Plataformas de dados / processamento ----
-    "Databricks":       ["databricks", "unity catalog", "delta lake", "delta table", "delta tables",
-                          "lakehouse", "data lakehouse", "mlflow", "pyspark"],
-    "Spark":            ["spark", "apache spark", "spark sql", "spark streaming", "structured streaming"],
-    "Hadoop":           ["hadoop", "hive", "hdfs", "mapreduce", "impala"],
-    "Kafka":            ["kafka", "apache kafka", "confluent", "amazon msk", "msk"],
+    # ----- Serviços AWS -----
+    "Amazon S3":        ["s3", "aws s3", "amazon s3"],
+    "Amazon Redshift":  ["redshift", "amazon redshift", "aws redshift"],
+    "AWS Glue":         ["aws glue", "glue"],
+    "Amazon Athena":    ["athena", "aws athena", "amazon athena"],
+    "AWS Lambda":       ["aws lambda", "lambda"],
+    "Amazon EMR":       ["emr", "aws emr"],
+    "Amazon Kinesis":   ["kinesis"],
+    "Amazon EC2":       ["ec2"],
+    "Amazon SageMaker": ["sagemaker", "aws sagemaker", "amazon sagemaker"],
+    "AWS Step Functions": ["step functions"],
+    "Amazon DynamoDB":  ["dynamodb"],
+    "Amazon RDS":       ["rds", "aws rds"],
+    "Amazon CloudWatch": ["cloudwatch"],
+    "Amazon MSK":       ["amazon msk", "msk"],
+
+    # ----- Serviços Azure -----
+    "Azure Data Factory": ["azure data factory", "adf"],
+    "Azure DevOps":     ["azure devops"],
+    "Azure Synapse":    ["azure synapse", "synapse", "azure synapse analytics"],
+    "Azure Functions":  ["azure functions"],
+    "Azure Data Lake Storage": ["azure data lake", "azure data lake storage", "adls"],
+    "Azure Event Hub":  ["azure event hub"],
+    "Microsoft Fabric": ["microsoft fabric", "fabric"],
+    "Azure SQL":        ["azure sql"],
+    "Azure Blob Storage": ["azure blob storage"],
+
+    # ----- Serviços GCP -----
+    "BigQuery":         ["bigquery", "google bigquery"],
+    "Dataflow":         ["dataflow"],
+    "Dataproc":         ["dataproc"],
+    "Cloud Composer":   ["cloud composer"],
+    "Cloud Functions":  ["cloud functions"],
+    "Cloud Run":        ["cloud run"],
+    "Pub/Sub":          ["pub/sub"],
+    "Cloud Storage":    ["cloud storage"],
+    "Dataform":         ["dataform"],
+    "Vertex AI":        ["vertex ai", "vertex"],
+
+    # ===================== Plataformas de dados / processamento =====================
+    "Databricks":       ["databricks"],
+    "Unity Catalog":    ["unity catalog"],
+    "Delta Lake":       ["delta lake", "delta table", "delta tables"],
+    "Lakehouse":        ["lakehouse", "data lakehouse"],
+    "MLflow":           ["mlflow"],
+    "Spark":            ["spark", "apache spark"],
+    "Spark SQL":        ["spark sql"],
+    "Spark Streaming":  ["spark streaming", "structured streaming"],
+    "Hadoop":           ["hadoop"],
+    "Hive":             ["hive"],
+    "HDFS":             ["hdfs"],
+    "MapReduce":        ["mapreduce"],
+    "Impala":           ["impala"],
+    "Kafka":            ["kafka", "apache kafka"],
+    "Confluent":        ["confluent"],
     "Flink":            ["flink", "apache flink"],
     "dbt":              ["dbt"],
-    "Snowflake":        ["snowflake", "snowpark", "snowpipe"],
+    "Snowflake":        ["snowflake"],
+    "Snowpark":         ["snowpark"],
+    "Snowpipe":         ["snowpipe"],
 
-    # ---- Orquestração ----
-    "Airflow":          ["airflow", "apache airflow", "mwaa", "cloud composer"],
+    # ===================== Orquestração =====================
+    "Airflow":          ["airflow", "apache airflow", "mwaa"],
     "Dagster":          ["dagster"],
     "Prefect":          ["prefect"],
     "Luigi":            ["luigi"],
 
-    # ---- Bancos de dados ----
+    # ===================== Bancos de dados =====================
     "PostgreSQL":       ["postgresql", "postgres"],
-    "MySQL":            ["mysql", "mariadb"],
-    "SQL Server":       ["sql server", "ssis", "ssas", "mssql"],
-    "Oracle":           ["oracle", "oracle database"],
+    "MySQL":            ["mysql"],
+    "MariaDB":          ["mariadb"],
+    "SQL Server":       ["sql server", "mssql"],
+    "SSIS":             ["ssis"],
+    "SSAS":             ["ssas"],
+    "Oracle Database":  ["oracle", "oracle database"],
     "MongoDB":          ["mongodb"],
-    "NoSQL":            ["nosql", "cassandra", "redis", "dynamodb", "elasticsearch"],
+    "Cassandra":        ["cassandra"],
+    "Redis":            ["redis"],
+    "Elasticsearch":    ["elasticsearch"],
     "ClickHouse":       ["clickhouse"],
+    "NoSQL":            ["nosql"],
 
-    # ---- Engenharia / arquitetura de dados ----
-    "ETL":              ["etl", "elt", "etls", "elts", "etl/elt"],
+    # ===================== Engenharia / arquitetura de dados =====================
+    "ETL":              ["etl", "etls"],
+    "ELT":              ["elt", "elts"],
     "Data Integration": ["data integration", "integracao de dados"],
-    "Data Modeling":    ["data modeling", "modelagem de dados", "modelagem dimensional",
-                          "dimensional modeling", "star schema", "snowflake schema", "data vault",
-                          "modelagem dados", "data modelling"],
-    "Data Warehouse":   ["data warehouse", "data warehousing", "data mart", "datawarehouse",
-                          "data warehouses", "data marts"],
-    "Data Lake":        ["data lake", "data lakes", "delta lake", "lakehouse"],
+    "Data Modeling":    ["data modeling", "data modelling", "modelagem de dados", "modelagem dados"],
+    "Dimensional Modeling": ["dimensional modeling", "modelagem dimensional"],
+    "Star Schema":      ["star schema"],
+    "Snowflake Schema": ["snowflake schema"],
+    "Data Vault":       ["data vault"],
+    "Data Warehouse":   ["data warehouse", "data warehousing", "datawarehouse", "data warehouses"],
+    "Data Mart":        ["data mart", "data marts"],
+    "Data Lake":        ["data lake", "data lakes"],
     "Data Pipelines":   ["data pipeline", "data pipelines", "pipeline de dados", "pipelines"],
     "Big Data":         ["big data", "bigdata"],
-    "Data Governance":  ["data governance", "governanca de dados", "governanca", "lgpd", "gdpr",
-                          "data quality", "data catalog", "data lineage", "dama", "dmbok"],
-    "Data Architecture":["data architecture", "arquitetura de dados", "data mesh", "medallion architecture"],
-    "APIs":             ["api", "apis", "rest", "rest api", "rest apis", "restful", "api rest",
-                          "apis rest", "graphql", "soap", "api integration"],
+    "Data Governance":  ["data governance", "governanca de dados", "governanca"],
+    "Data Quality":     ["data quality"],
+    "Data Catalog":     ["data catalog"],
+    "Data Lineage":     ["data lineage"],
+    "DAMA/DMBOK":       ["dama", "dmbok"],
+    "LGPD":             ["lgpd"],
+    "GDPR":             ["gdpr"],
+    "Data Architecture": ["data architecture", "arquitetura de dados"],
+    "Data Mesh":        ["data mesh"],
+    "Medallion Architecture": ["medallion architecture"],
+    "APIs":             ["api", "apis"],
+    "REST":             ["rest", "rest api", "rest apis", "restful", "api rest", "apis rest"],
+    "GraphQL":          ["graphql"],
+    "SOAP":             ["soap"],
 
-    # ---- DevOps / infra ----
-    "Git":              ["git", "github", "gitlab", "github actions", "gitflow", "bitbucket", "versionamento", "version control"],
+    # ===================== DevOps / infra =====================
+    "Git":              ["git", "versionamento", "version control"],
+    "GitHub":           ["github"],
+    "GitLab":           ["gitlab"],
+    "Bitbucket":        ["bitbucket"],
+    "GitHub Actions":   ["github actions"],
+    "GitLab CI":        ["gitlab ci"],
     "Docker":           ["docker", "containers", "containerization"],
-    "Kubernetes":       ["kubernetes", "k8s", "eks", "gke", "helm"],
-    "Terraform":        ["terraform", "infrastructure as code", "iac", "opentofu", "pulumi"],
-    "CI/CD":            ["ci/cd", "cicd", "jenkins", "github actions", "gitlab ci", "azure devops"],
-    "Linux":            ["linux", "unix", "bash", "shell script", "shell scripting", "powershell"],
+    "Kubernetes":       ["kubernetes", "k8s"],
+    "Amazon EKS":       ["eks"],
+    "GKE":              ["gke"],
+    "Helm":             ["helm"],
+    "Terraform":        ["terraform"],
+    "Infrastructure as Code": ["infrastructure as code", "iac"],
+    "OpenTofu":         ["opentofu"],
+    "Pulumi":           ["pulumi"],
+    "CI/CD":            ["ci/cd", "cicd"],
+    "Jenkins":          ["jenkins"],
+    "Linux":            ["linux", "unix"],
+    "Bash":             ["bash", "shell script", "shell scripting"],
+    "PowerShell":       ["powershell"],
 
-    # ---- ML / IA ----
-    "Machine Learning": ["machine learning", "aprendizado de maquina", "scikit-learn", "xgboost",
-                          "lightgbm", "catboost", "random forest", "regression", "clustering"],
-    "Deep Learning":    ["deep learning", "tensorflow", "pytorch", "keras", "neural networks", "redes neurais"],
-    "LLM":              ["llm", "llms", "openai", "anthropic", "claude", "chatgpt", "gpt", "gemini",
-                          "langchain", "langgraph", "rag", "prompt engineering", "generative ai",
-                          "genai", "vector databases", "embeddings"],
-    "MLOps":            ["mlops", "mlflow", "kubeflow", "sagemaker", "feature store", "model deployment"],
+    # ===================== ML / IA =====================
+    "Machine Learning": ["machine learning", "aprendizado de maquina"],
+    "XGBoost":          ["xgboost"],
+    "LightGBM":         ["lightgbm"],
+    "CatBoost":         ["catboost"],
+    "Random Forest":    ["random forest"],
+    "Regression":       ["regression"],
+    "Clustering":       ["clustering"],
+    "Deep Learning":    ["deep learning"],
+    "TensorFlow":       ["tensorflow"],
+    "PyTorch":          ["pytorch"],
+    "Keras":            ["keras"],
+    "Neural Networks":  ["neural networks", "redes neurais"],
+    "LLM":              ["llm", "llms"],
+    "OpenAI":           ["openai", "chatgpt", "gpt"],
+    "Anthropic":        ["anthropic", "claude"],
+    "Gemini":           ["gemini"],
+    "LangChain":        ["langchain"],
+    "LangGraph":        ["langgraph"],
+    "RAG":              ["rag"],
+    "Prompt Engineering": ["prompt engineering"],
+    "Generative AI":    ["generative ai", "genai"],
+    "Vector Databases": ["vector databases"],
+    "Embeddings":       ["embeddings"],
+    "MLOps":            ["mlops"],
+    "Kubeflow":         ["kubeflow"],
+    "Feature Store":    ["feature store"],
+    "Model Deployment": ["model deployment"],
     "NLP":              ["nlp", "natural language processing"],
-    "Estatistica":      ["estatistica", "statistics", "statistical analysis", "analise estatistica",
-                          "probabilidade", "probability", "inferencia estatistica"],
+    "Estatistica":      ["estatistica", "statistics", "statistical analysis", "analise estatistica"],
+    "Probabilidade":    ["probabilidade", "probability"],
+    "Inferencia Estatistica": ["inferencia estatistica"],
 
-    # ---- Ferramentas de produtividade ----
-    "Excel":            ["excel", "microsoft excel", "tabelas dinamicas", "pivot tables", "procv",
-                          "vlookup", "power query", "formulas", "pacote office", "microsoft office", "office"],
-    "Google Sheets":    ["google sheets", "google planilhas", "google workspace", "gsheet"],
+    # ===================== Produtividade =====================
+    "Excel":            ["excel", "microsoft excel", "tabelas dinamicas", "pivot tables",
+                         "procv", "vlookup", "formulas"],
+    "Microsoft Office": ["pacote office", "microsoft office", "office"],
+    "Google Sheets":    ["google sheets", "google planilhas", "gsheet"],
+    "Google Workspace": ["google workspace"],
     "PowerPoint":       ["powerpoint", "power point", "microsoft powerpoint"],
-    "Power Automate":   ["power automate", "power apps", "power platform", "microsoft power platform"],
-    "Jira":             ["jira", "confluence"],
+    "Power Automate":   ["power automate"],
+    "Power Apps":       ["power apps"],
+    "Power Platform":   ["power platform", "microsoft power platform"],
+    "Jira":             ["jira"],
+    "Confluence":       ["confluence"],
 
-    # ---- Domínio / ERP ----
-    "SAP":              ["sap", "abap", "sap bw", "sap hana"],
-    "ERP":              ["erp", "protheus", "totvs", "netsuite"],
-    "CRM":              ["crm", "salesforce", "hubspot"],
+    # ===================== Domínio / ERP =====================
+    "SAP":              ["sap", "sap bw", "sap hana"],
+    "ABAP":             ["abap"],
+    "ERP":              ["erp"],
+    "Protheus":         ["protheus"],
+    "TOTVS":            ["totvs"],
+    "NetSuite":         ["netsuite"],
+    "CRM":              ["crm"],
+    "Salesforce":       ["salesforce"],
+    "HubSpot":          ["hubspot"],
     "BPM":              ["bpm", "business process management"],
     "ECM":              ["ecm", "enterprise content management"],
     "Workflow":         ["workflow", "workflows"],
 
-    # ---- Metodologias ----
-    "Agile":            ["agile", "agil", "scrum", "kanban", "metodologias ageis", "metodologia agil", "safe", "lean"],
+    # ===================== Metodologias =====================
+    "Agile":            ["agile", "agil", "metodologias ageis", "metodologia agil"],
+    "Scrum":            ["scrum"],
+    "Kanban":           ["kanban"],
+    "SAFe":             ["safe"],
+    "Lean":             ["lean"],
 
-    # ---- Soft skills ----
+    # ===================== Soft skills =====================
     "Comunicacao":      ["comunicacao", "communication", "good communication", "clear communication"],
-    "Trabalho em Equipe":["trabalho em equipe", "teamwork", "team work", "colaboracao", "collaboration", "collaborative"],
+    "Trabalho em Equipe": ["trabalho em equipe", "teamwork", "team work", "colaboracao",
+                           "collaboration", "collaborative"],
     "Proatividade":     ["proatividade", "proactivity", "proactive", "proativo", "iniciativa", "initiative"],
-    "Resolucao de Problemas":["resolucao de problemas", "problem solving", "problem-solving", "problem solver"],
-    "Pensamento Analitico":["pensamento analitico", "analytical thinking", "analytical", "raciocinio logico",
-                          "logical reasoning", "capacidade analitica", "perfil analitico", "analytical skills"],
-    "Organizacao":      ["organizacao", "organization", "organized", "organizado", "atencao aos detalhes",
-                          "attention to detail", "detail-oriented"],
+    "Resolucao de Problemas": ["resolucao de problemas", "problem solving", "problem-solving", "problem solver"],
+    "Pensamento Analitico": ["pensamento analitico", "analytical thinking", "analytical",
+                             "raciocinio logico", "logical reasoning", "capacidade analitica",
+                             "perfil analitico", "analytical skills"],
+    "Organizacao":      ["organizacao", "organization", "organized", "organizado",
+                         "atencao aos detalhes", "attention to detail", "detail-oriented"],
     "Autonomia":        ["autonomia", "autonomy", "independence", "senso de dono", "ownership"],
     "Lideranca":        ["lideranca", "leadership", "mentorship", "mentoring", "mentoria"],
-    "Curiosidade":      ["curiosidade", "curiosity", "curioso", "curious", "vontade de aprender", "willingness to learn"],
+    "Curiosidade":      ["curiosidade", "curiosity", "curioso", "curious",
+                         "vontade de aprender", "willingness to learn"],
     "Storytelling":     ["storytelling", "data storytelling"],
-    "Visao Estrategica":["visao estrategica", "strategic thinking", "strategic vision", "visao de negocio"],
+    "Visao Estrategica": ["visao estrategica", "strategic thinking", "strategic vision", "visao de negocio"],
 
-    # ---- Idiomas ----
+    # ===================== Idiomas =====================
     "Ingles":           ["ingles", "english", "ingles intermediario", "ingles avancado",
-                          "advanced english", "english (advanced)", "english (intermediate)"],
+                         "advanced english", "english (advanced)", "english (intermediate)"],
     "Espanhol":         ["espanhol", "spanish"],
+    "Francês":          ["frances", "french"],
+    "Alemão":           ["alemao", "german"],
+    "Italiano":         ["italiano", "italian"],
 }

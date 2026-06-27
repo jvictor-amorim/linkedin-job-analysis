@@ -1,6 +1,14 @@
 -- Schema do pipeline LinkedIn Job Analysis.
 -- Modelo normalizado: uma vaga em `jobs`, uma linha por skill em `job_skills`.
+-- `job_html` guarda o HTML bruto p/ reprocessar sem refazer a request.
 -- Idempotente: pode ser executado repetidamente.
+
+-- Cache do HTML bruto das vagas (fonte para reprocessamento offline).
+CREATE TABLE IF NOT EXISTS job_html (
+    job_id     TEXT PRIMARY KEY,
+    html_text  TEXT NOT NULL,
+    fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
 
 CREATE TABLE IF NOT EXISTS jobs (
     job_id     TEXT PRIMARY KEY,

@@ -18,7 +18,6 @@ def collect_job_ids() -> None:
 
 
 def scrape_skills() -> None:
-    # Abordagem regex: baixa o HTML e extrai skills/modalidade numa só passada.
     _run_script("extract/scrape_html_rule/scrape_html_rule.py")
 
 
