@@ -25,7 +25,7 @@ mercado de BI?* — explorada num notebook de análise com pandas.
 - [Instalação](#-instalação)
 - [Configuração (`.env`)](#-configuração-env)
 - [Como executar](#-como-executar)
-- [Análise no notebook](#-análise-no-notebook)
+- [Análise e Visualização](#-análise-e-visualização)
 - [Considerações e limitações](#-considerações-e-limitações)
 
 ---
@@ -38,7 +38,7 @@ mercado de BI?* — explorada num notebook de análise com pandas.
 | Scraping / parsing | `urllib` (HTTP) + `BeautifulSoup4` + `re` (regex) |
 | Armazenamento | CSV/JSON (local) **ou** PostgreSQL (`psycopg2`) |
 | Orquestração | Apache Airflow (DAG `@daily`) via Docker Compose |
-| Análise | Jupyter + pandas + unidecode |
+| Análise e Visualização | Jupyter + pandas + matplotlib + unidecode |
 
 ---
 
@@ -104,6 +104,13 @@ linkedin-job-analysis/
 │
 ├── notebooks/
 │   └── index.ipynb              # Análise exploratória (skills, cargos, níveis) com pandas
+│
+├── analysis/
+│   ├── dashboard_linkedin.py    # Gera carrossel de imagens (PNG) para LinkedIn
+│   └── post_copy.md             # Sugestão de texto e copy para o post
+│
+├── output/
+│   └── carousel/                # Imagens geradas pelo dashboard (PNG)
 │
 └── data/                        # Saídas do pipeline (geradas em runtime)
     ├── job_ids.csv              #   IDs coletados na etapa 1
@@ -292,9 +299,9 @@ source venv/bin/activate          # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-> ℹ️ Este `venv` cobre **o pipeline**. O notebook de análise usa ainda `pandas`,
-> `unidecode` e `jupyter`, que **não estão** no `requirements.txt`. Para rodar
-> `notebooks/index.ipynb`, instale-as à parte: `pip install pandas unidecode jupyter`.
+> ℹ️ Este `venv` cobre **o pipeline**. A parte de análise e visualização usa ainda
+> `matplotlib`, `unidecode` e `jupyter` (já que `pandas` está no `requirements.txt`).
+> Instale-os à parte para explorar: `pip install matplotlib unidecode jupyter`.
 
 > 🛠 **Solução de problemas — venv movido/renomeado.** Se você mover ou renomear a pasta do
 > projeto, os *wrappers* do venv (`venv/bin/pip`, `jupyter`, etc.) quebram, pois o shebang
@@ -417,7 +424,9 @@ ative a DAG **`linkedin_jobs_pipeline`** e dispare-a — ela executa as três et
 
 ---
 
-## 📊 Análise no notebook
+## 📊 Análise e Visualização
+
+### Exploratória (Notebook)
 
 Abra [`notebooks/index.ipynb`](notebooks/index.ipynb) com Jupyter:
 
@@ -433,15 +442,20 @@ A análise carrega o `data/scrape_html_rule.json` com pandas e faz, entre outras
 - **padronização de nomes de skills** (unifica variações como `powerbi`/`power bi` → `Power BI`);
 - **rankings** das skills e dos cargos mais frequentes.
 
+### Dashboard LinkedIn (Carrossel)
+
+Gera um carrossel de imagens para publicação no LinkedIn (foco em "Skills x Senioridade"). Lê os dados diretamente do PostgreSQL (tabelas `jobs` e `job_skills`).
+
+```bash
+python analysis/dashboard_linkedin.py            # gera os PNGs em output/carousel/
+python analysis/dashboard_linkedin.py --validate # apenas inspeciona os dados no terminal
+```
+
+Veja o arquivo [`analysis/post_copy.md`](analysis/post_copy.md) para a sugestão de legenda e detalhes sobre os slides gerados.
+
 ---
 
 ## ⚠️ Considerações e limitações
 
 - **Uso educacional.** O scraping atinge endpoints públicos do LinkedIn; respeite os Termos
   de Uso da plataforma. O projeto aplica delays aleatórios para não sobrecarregar o serviço.
-- **Heurística.** A extração de skills e a detecção de modalidade são baseadas em regex e em
-  um dicionário mantido à mão — há margem para falsos positivos/negativos.
-- **Fragilidade dos seletores.** O parsing depende da estrutura do HTML do LinkedIn; mudanças
-  no site podem exigir ajuste dos seletores CSS em `scrape_html_rule.py`.
-- **Cache.** Como o HTML é cacheado, é possível iterar no dicionário de skills e reprocessar
-  tudo offline com `--source cache`, sem novas requisições.
