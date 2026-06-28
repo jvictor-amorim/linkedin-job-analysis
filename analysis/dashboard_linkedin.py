@@ -465,11 +465,11 @@ def slide_amostra(df):
 
     _header(fig, "A amostra", "De onde vêm os números",
             f"{total} vagas de carreira em Dados, classificadas pela\n"
-            "senioridade declarada no título da vaga.")
+            "senioridade.")
     ax = _axes(fig, rect=(0.30, 0.22, 0.63, 0.50))
     _barh(ax, labels, values, colors, value_fmt="{:.0f}")
     fig.text(0.07, 0.145,
-             f"⚠  {pct_ne:.0f}% das vagas não trazem o nível no título "
+             f"⚠  {pct_ne:.0f}% das vagas não trazem informação sobre a senioridade "
              "(“Não especificado”).\nNo próximo slide analisamos o perfil dessas vagas.",
              color=MUTED, fontsize=11.5, va="top", linespacing=1.4)
     _footer(fig)
@@ -685,9 +685,8 @@ def slide_conclusao(df):
 
     fig.text(0.07, 0.205,
              f"Metodologia: {n} vagas de Dados coletadas do LinkedIn (BR).\n"
-             "Senioridade inferida do título; 52% das vagas não a declaram e\n"
-             "ficaram fora da comparação por nível. Skills extraídas por\n"
-             "dicionário (regex) da descrição da vaga.",
+             "Senioridade; 52% das vagas não a declaram e\n"
+             "ficaram fora da comparação por nível. Skills extraídas por\n",
              color=MUTED, fontsize=10.5, va="top", linespacing=1.45)
     fig.text(0.07, 0.05, "Salvou? Comenta qual skill te surpreendeu ↓",
              color=HILITE, fontsize=13.5, fontweight="bold")

@@ -13,3 +13,4 @@ data/scrape_html_rule.json
 data/jobs.csv
 data/job_skills.csv
 gemini.config.json
+skills_standardized.csv
