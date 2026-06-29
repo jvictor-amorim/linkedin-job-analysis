@@ -14,3 +14,4 @@ data/jobs.csv
 data/job_skills.csv
 gemini.config.json
 skills_standardized.csv
+/analysis/*
