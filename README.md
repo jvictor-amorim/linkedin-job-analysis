@@ -56,6 +56,7 @@ flowchart LR
     D --> F(load.py)
     F -->|normaliza| G[(jobs + job_skills)]
     G --> H[notebooks/index.ipynb<br/>análise pandas]
+    H -->|exporta skills_standardized.csv| I[analysis/dashboard_from_csv.py<br/>carrossel PNG]
 ```
 
 1. **Extract — coleta de IDs**: descobre os identificadores das vagas.
@@ -106,7 +107,7 @@ linkedin-job-analysis/
 │   └── index.ipynb              # Análise exploratória (skills, cargos, níveis) com pandas
 │
 ├── analysis/
-│   ├── dashboard_linkedin.py    # Gera carrossel de imagens (PNG) para LinkedIn
+│   ├── dashboard_from_csv.py    # Gera o carrossel de imagens (PNG) a partir do CSV do notebook
 │   └── post_copy.md             # Sugestão de texto e copy para o post
 │
 ├── output/
@@ -117,7 +118,8 @@ linkedin-job-analysis/
     ├── job_html.csv             #   Cache do HTML bruto (modo local)
     ├── scrape_html_rule.json    #   Vagas extraídas (saída da etapa 2)
     ├── jobs.csv                 #   Tabela jobs (modo local)
-    └── job_skills.csv           #   Tabela job_skills (modo local)
+    ├── job_skills.csv           #   Tabela job_skills (modo local)
+    └── skills_standardized.csv  #   Export do notebook p/ o dashboard (vaga × skill enriquecida)
 ```
 
 ---
@@ -440,16 +442,35 @@ A análise carrega o `data/scrape_html_rule.json` com pandas e faz, entre outras
 - **normalização de cargos** em grupos (`Data Engineer`, `Data Analyst`, `BI Analyst`,
   `Data Scientist`, `Analytics Engineer`, `Data Architect`, `Data Leadership`, `Data Intern`...);
 - **padronização de nomes de skills** (unifica variações como `powerbi`/`power bi` → `Power BI`);
-- **rankings** das skills e dos cargos mais frequentes.
+- **classificação de senioridade** (`level`) a partir do título da vaga e marcação do tipo
+  de skill (`tipo_skill`);
+- **rankings** das skills e dos cargos mais frequentes;
+- **export de `data/skills_standardized.csv`** — uma linha por par vaga × skill, enriquecida
+  com `position_group`, `level`, `skill_grouped` e `tipo_skill` — consumido pelo dashboard.
 
 ### Dashboard LinkedIn (Carrossel)
 
-Gera um carrossel de imagens para publicação no LinkedIn (foco em "Skills x Senioridade"). Lê os dados diretamente do PostgreSQL (tabelas `jobs` e `job_skills`).
+[`analysis/dashboard_from_csv.py`](analysis/dashboard_from_csv.py) gera um carrossel de
+imagens (PNG, 1080×1350 px) para publicação no LinkedIn, com a narrativa
+**"Skills × Senioridade"** — como o conjunto de skills mais pedidas muda de júnior para
+sênior. Lê o `data/skills_standardized.csv` exportado pelo notebook.
 
 ```bash
-python analysis/dashboard_linkedin.py            # gera os PNGs em output/carousel/
-python analysis/dashboard_linkedin.py --validate # apenas inspeciona os dados no terminal
+python analysis/dashboard_from_csv.py            # gera os PNGs em output/carousel/
+python analysis/dashboard_from_csv.py --validate # apenas inspeciona os números no terminal
 ```
+
+São **9 slides**, em ordem (`01` → `09`): capa, a amostra, perfil das vagas sem
+senioridade, top 10 de skills (júnior, pleno e sênior), o núcleo (skills presentes em
+todos os níveis), a virada (o que diferencia o sênior) e a conclusão.
+
+**Metodologia aplicada na leitura dos dados:**
+
+- foca em carreira de dados — exclui os grupos `Not Data Role` e `Data Talent Pool`;
+- vagas que anunciam uma **faixa** de senioridade (ex.: "Pleno/Sênior") ficam fora da
+  comparação por nível, para que as contagens por senioridade somem corretamente;
+- o percentual de vagas **sem senioridade declarada** é calculado a partir dos dados (não
+  é fixo), mantendo os slides sempre consistentes com a amostra atual.
 
 Veja o arquivo [`analysis/post_copy.md`](analysis/post_copy.md) para a sugestão de legenda e detalhes sobre os slides gerados.
 
