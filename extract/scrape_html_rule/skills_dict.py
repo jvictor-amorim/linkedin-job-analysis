@@ -258,12 +258,11 @@ SKILLS = {
     "Inferencia Estatistica": ["inferencia estatistica"],
 
     # ===================== Produtividade =====================
-    "Excel":            ["excel", "microsoft excel", "tabelas dinamicas", "pivot tables",
-                         "procv", "vlookup", "formulas"],
-    "Microsoft Office": ["pacote office", "microsoft office", "office"],
-    "Google Sheets":    ["google sheets", "google planilhas", "gsheet"],
-    "Google Workspace": ["google workspace"],
-    "PowerPoint":       ["powerpoint", "power point", "microsoft powerpoint"],
+    "Excel":            ["excel", "microsoft excel", "pacote office", "microsoft office", "office"],
+    #"Microsoft Office": ["pacote office", "microsoft office", "office"],
+    #"Google Sheets":    ["google sheets", "google planilhas", "gsheet"],
+    #"Google Workspace": ["google workspace"],
+    #"PowerPoint":       ["powerpoint", "power point", "microsoft powerpoint"],
     "Power Automate":   ["power automate"],
     "Power Apps":       ["power apps"],
     "Power Platform":   ["power platform", "microsoft power platform"],
@@ -282,7 +281,6 @@ SKILLS = {
     "HubSpot":          ["hubspot"],
     "BPM":              ["bpm", "business process management"],
     "ECM":              ["ecm", "enterprise content management"],
-    "Workflow":         ["workflow", "workflows"],
 
     # ===================== Metodologias =====================
     "Agile":            ["agile", "agil", "metodologias ageis", "metodologia agil"],

@@ -10,6 +10,7 @@ entre júnior, pleno e sênior (o que estudar para subir de nível).
 
 import argparse
 import sys
+import textwrap
 from pathlib import Path
 
 import pandas as pd
@@ -51,8 +52,13 @@ _DISPLAY = {
     "curiosidade": "Curiosidade",
     "storytelling": "Storytelling",
     "visao estrategica": "Visão Estratégica",
-    "ingles": "Inglês", 
-    "estatistica": "Estatística"
+    "ingles": "Inglês",
+    "estatistica": "Estatística",
+    "sql": "SQL",
+    "etl": "ETL",
+    "elt": "ELT",
+    "apis": "APIs",
+    "ci/cd": "CI/CD",
 }
 
 def _pretty(skill) -> str:
@@ -74,7 +80,12 @@ def load_from_csv() -> pd.DataFrame:
     
     # Foca em carreira de dados (ignora Not Data Role etc)
     df = df[~df["position_group"].isin(EXCLUDED_POSITIONS)].reset_index(drop=True)
-    
+
+    # Vagas que anunciam uma faixa de senioridade (ex.: "Pleno/Sênior") vêm com
+    # mais de um `level` e quebrariam a soma/percentuais por nível — excluídas.
+    multi_level = df.groupby("job_id")["level"].transform("nunique") > 1
+    df = df[~multi_level].reset_index(drop=True)
+
     return df
 
 def skill_share_by_level(df: pd.DataFrame, level: str, tipo: str = None) -> pd.DataFrame:
@@ -96,6 +107,14 @@ def skill_share_by_level(df: pd.DataFrame, level: str, tipo: str = None) -> pd.D
     )
     g["pct"] = 100 * g["n_jobs"] / total_jobs
     return g
+
+def _pct_nao_especificado(df) -> float:
+    """% de vagas (job_id único) sem senioridade declarada."""
+    total = df["job_id"].nunique()
+    if total == 0:
+        return 0.0
+    ne = df[df["level"] == "nao_especificado"]["job_id"].nunique()
+    return 100 * ne / total
 
 def _validate(df: pd.DataFrame) -> None:
     print("\n=== Vagas por senioridade (job_id único) ===")
@@ -209,7 +228,7 @@ def slide_amostra(df):
     values = [int(counts.get(k, 0)) for k in order]
     colors = [LEVEL_COLORS.get(k, "#FFFFFF") for k in order]
     total = df["job_id"].nunique()
-    pct_ne = 100 * counts.get("nao_especificado", 0) / total if total > 0 else 0
+    pct_ne = _pct_nao_especificado(df)
 
     _header(fig, "A amostra", "De onde vêm os números",
             f"{total} vagas de carreira em Dados, classificadas pela\n"
@@ -380,25 +399,28 @@ def slide_conclusao(df):
     fig.text(0.07, 0.85, "O caminho até o Sênior", color=INK, fontsize=30,
              fontweight="bold", va="top")
     bullets = [
-        ("SQL + Python", "a base inegociável em todos os níveis."),
-        ("Júnior", "domine Power BI, Excel e dashboards."),
-        ("Pleno → Sênior", "migre para pipelines, ETL e cloud (AWS/Databricks)."),
-        ("Governança de dados", "é o que separa o sênior do resto."),
+        ("SQL + Python", "A base inegociável para qualquer nível profissional."),
+        ("Júnior", "Foco em Power BI e Excel para construir uma base sólida de entregas e análise de dados."),
+        ("Pleno", "O mercado espera que comece a desapegar de relatórios e dashboards, especializando-se em pipelines de dados e processos de ETL."),
+        ("Sênior", "Domínio da arquitetura de dados, escalabilidade, performance e decisões técnicas."),
+        ("Diferencial do Sênior", "Governança de Dados, qualidade, segurança e estratégia de dados são os conhecimentos que realmente diferenciam o Sênior do restante do mercado."),
     ]
-    yb = 0.70
+    yb = 0.74
     for head, txt in bullets:
-        fig.text(0.07, yb, "→", color=HILITE, fontsize=16, fontweight="bold")
-        fig.text(0.12, yb, head, color=INK, fontsize=16, fontweight="bold")
-        fig.text(0.12, yb - 0.032, txt, color=MUTED, fontsize=13.5)
-        yb -= 0.105
+        wrapped = textwrap.fill(txt, width=68)
+        nlines = wrapped.count("\n") + 1
+        fig.text(0.07, yb, "→", color=HILITE, fontsize=16, fontweight="bold", va="top")
+        fig.text(0.12, yb, head, color=INK, fontsize=16, fontweight="bold", va="top")
+        fig.text(0.12, yb - 0.035, wrapped, color=MUTED, fontsize=12.5,
+                 va="top", linespacing=1.35)
+        yb -= 0.035 + nlines * 0.027 + 0.022
 
-    fig.text(0.07, 0.205,
+    fig.text(0.07, 0.135,
              f"Metodologia: {n} vagas de Dados coletadas do LinkedIn (BR).\n"
-             "Senioridade: 52% das vagas não a declaram e\n"
-             "ficaram fora da comparação por nível.\n",
+             f"Senioridade: {_pct_nao_especificado(df):.0f}% das vagas não a declaram e ficaram fora da comparação por nível.",
              color=MUTED, fontsize=10.5, va="top", linespacing=1.45)
-    fig.text(0.07, 0.05, "Salvou? Comenta qual skill te surpreendeu ↓",
-             color=HILITE, fontsize=13.5, fontweight="bold")
+    #fig.text(0.07, 0.05, "Salvou? Comenta qual skill te surpreendeu ↓",
+    #         color=HILITE, fontsize=13.5, fontweight="bold")
     return _save(fig, "09_conclusao.png")
 
 def build_slides(df):
